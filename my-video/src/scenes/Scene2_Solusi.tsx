@@ -1,5 +1,6 @@
 import React from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig, Img, staticFile, interpolateColors } from "remotion";
+import { Check, Loader2, Clock } from "lucide-react";
 import { theme } from "../theme";
 
 export const Scene2_Solusi: React.FC = () => {
@@ -10,7 +11,7 @@ export const Scene2_Solusi: React.FC = () => {
   const START_E = 60;
   const START_T = 300;
   const START_L = 550;
-  const START_AIRFLOW = 750;
+  const START_AIRFLOW = 815;
 
   // --- CAMERA & PANNING LOGIC ---
   const START_INTRO = 0;
@@ -95,26 +96,47 @@ export const Scene2_Solusi: React.FC = () => {
 
   // Airflow Zoom Transition Logic
   // 1. Center the Excel file (starts at 720, after rows finish dropping)
-  const centerExcel = spring({ frame: frame - 720, fps, config: { damping: 14 } });
+  const centerExcel = spring({ frame: frame - 720, fps, config: { damping: 18, mass: 1.5, stiffness: 60 } });
   
-  // 1.5 Fade out excel icon and text (starts at 735)
-  const fadeOutExcel = spring({ frame: frame - 735, fps, config: { damping: 14 } });
+  // 1.2 Morph into circle & Fade out Excel (starts at 735)
+  const morphCircle = spring({ frame: frame - 735, fps, config: { damping: 16, stiffness: 70 } });
   
-  // 2. Smooth Zoom In (starts at 750)
-  const zoomTransition = spring({ frame: frame - START_AIRFLOW, fps, config: { damping: 25, mass: 2.5, stiffness: 40 } });
+  // 1.4 Show Checkmark (starts at 775)
+  const showCheckmark = spring({ frame: frame - 775, fps, config: { damping: 14, stiffness: 80 } });
   
-  const excelScale = fallExcel + (zoomTransition * 150);
-  const excelBgColor = interpolateColors(zoomTransition, [0, 1], [theme.surface, theme.canvas]);
-  const excelContentOpacity = interpolate(fadeOutExcel, [0, 1], [1, 0]);
+  // 1.5 Hide Checkmark (starts at 805)
+  const hideCheckmark = interpolate(frame, [805, 810], [0, 1], { extrapolateRight: "clamp", extrapolateLeft: "clamp" });
+  
+  // 2. Smooth Zoom In (starts at 815)
+  const zoomTransition = spring({ frame: frame - START_AIRFLOW, fps, config: { damping: 40, mass: 4, stiffness: 12 } });
+  
+  const excelScale = fallExcel + (zoomTransition * 40);
+  
+  let currentBgColor: string = theme.surface;
+  if (zoomTransition > 0) {
+      currentBgColor = interpolateColors(zoomTransition, [0, 1], [theme.surface, theme.canvas]);
+  }
+
+  const boxWidth = interpolate(morphCircle, [0, 1], [500, 130]);
+  const boxBorderRadius = interpolate(morphCircle, [0, 1], [16, 65]);
+  const loadingRotation = (frame - 735) * 8; // continuous rotation
+  
+  const excelContentOpacity = interpolate(frame, [720, 730], [1, 0], { extrapolateRight: "clamp", extrapolateLeft: "clamp" });
+  const hideLoader = interpolate(frame, [770, 775], [0, 1], { extrapolateRight: "clamp", extrapolateLeft: "clamp" });
+  const loadingOpacity = interpolate(morphCircle, [0, 0.5], [0, 1], { extrapolateRight: "clamp" }) * (1 - hideLoader);
+  const checkmarkScale = interpolate(showCheckmark, [0, 1], [0, 1]);
+  const checkmarkOpacity = interpolate(showCheckmark, [0, 0.5], [0, 1], { extrapolateRight: "clamp", extrapolateLeft: "clamp" }) - hideCheckmark;
+
   const excelTop = interpolate(centerExcel, [0, 1], [300, 90]);
   const excelYPercent = interpolate(centerExcel, [0, 1], [0, -50]);
   
   // 3. Airflow Logo & Text Reveal
-  const airflowPop = spring({ frame: frame - 790, fps, config: { damping: 12, mass: 1.2 } });
-  const slideAndReveal = spring({ frame: frame - 830, fps, config: { damping: 14 } });
-  const floatIconsOpacity = spring({ frame: frame - 870, fps, config: { damping: 14 } });
+  const airflowPop = spring({ frame: frame - 870, fps, config: { damping: 15, mass: 1.5, stiffness: 40 } });
+  const slideAndReveal = spring({ frame: frame - 920, fps, config: { damping: 20, mass: 1.5, stiffness: 45 } });
   
-  const batonRotate = interpolate(Math.sin(frame / 12), [-1, 1], [-15, 25]);
+  // 4. Airflow Schedule Grid Reveal
+  const slideUpAirflow = spring({ frame: frame - 1000, fps, config: { damping: 18, mass: 1.2, stiffness: 50 } });
+  const START_GRID = 1030;
 
   return (
     <AbsoluteFill style={{ backgroundColor: theme.ink, fontFamily: "sans-serif" }}>
@@ -343,16 +365,51 @@ export const Scene2_Solusi: React.FC = () => {
                   position: "absolute",
                   top: excelTop, left: "50%",
                   transform: `translate(-50%, ${excelYPercent}%) scale(${excelScale})`,
-                  backgroundColor: excelBgColor,
-                  padding: "20px 40px",
-                  borderRadius: 16,
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 15,
+                  backgroundColor: currentBgColor,
+                  width: boxWidth,
+                  height: 130,
+                  borderRadius: boxBorderRadius,
+                  display: "flex", justifyContent: "center", alignItems: "center",
                   boxShadow: zoomTransition > 0.5 ? "none" : `0 20px 50px ${theme.ink}80`,
-                  zIndex: 10
+                  zIndex: 10,
+                  overflow: "hidden"
                 }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 15, opacity: excelContentOpacity }}>
+                  {/* Excel Content */}
+                  {/* Excel Content */}
+                  <div style={{ 
+                    position: "absolute", 
+                    display: "flex", alignItems: "center", gap: 15, 
+                    opacity: excelContentOpacity,
+                    pointerEvents: "none"
+                  }}>
                     <Img src={staticFile(`icons/excel-document-svgrepo-com.svg`)} style={{ width: 80, height: 80 }} />
-                    <span style={{ color: theme.ink, fontSize: 24, fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>Report Agustus 2026.xlsx</span>
+                    <span style={{ 
+                      color: theme.ink, fontSize: 24, fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap",
+                      display: morphCircle > 0.9 ? "none" : "block"
+                    }}>
+                      Report Agustus 2026.xlsx
+                    </span>
+                  </div>
+                  {/* Loading Content */}
+                  <div style={{ 
+                    position: "absolute", 
+                    display: "flex", justifyContent: "center", alignItems: "center",
+                    opacity: loadingOpacity,
+                    pointerEvents: "none"
+                  }}>
+                    <div style={{ transform: `rotate(${loadingRotation}deg)` }}>
+                        <Loader2 size={60} color={theme.ink} strokeWidth={3} />
+                    </div>
+                  </div>
+                  {/* Sent/Loaded Content */}
+                  <div style={{ 
+                    position: "absolute", 
+                    display: "flex", justifyContent: "center", alignItems: "center",
+                    opacity: checkmarkOpacity,
+                    transform: `scale(${checkmarkScale})`,
+                    pointerEvents: "none"
+                  }}>
+                    <Check size={80} color="#10B981" strokeWidth={3.5} />
                   </div>
                 </div>
             </div>
@@ -360,17 +417,19 @@ export const Scene2_Solusi: React.FC = () => {
       </div>
 
       {/* --- AIRFLOW FINAL REVEAL (Absolute to Screen) --- */}
-      {frame >= START_AIRFLOW && zoomTransition > 0.05 && (
-        <div style={{
-          position: "absolute", width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column", zIndex: 30
-        }}>
-          {/* Airflow SVG Masked Reveal */}
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center",
-            transform: `scale(${airflowPop})`,
-            position: "relative"
+      {(() => {
+        return frame >= START_AIRFLOW && zoomTransition > 0.05 && (
+          <div style={{
+            position: "absolute", width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column", zIndex: 30
           }}>
+            {/* Airflow SVG Masked Reveal (Sliding up) */}
+            <div>
+              <div style={{ 
+                display: "flex", 
+              alignItems: "center",
+              transform: `scale(${airflowPop}) translateY(-${interpolate(slideUpAirflow, [0, 1], [0, 150])}px)`,
+              position: "relative"
+            }}>
             {/* Pinwheel dari Apache Airflow.svg */}
             <div style={{ width: 175, height: 175, flexShrink: 0 }}>
                 <Img src={staticFile(`icons/Apache Airflow.svg`)} style={{ width: 175, height: 175, maxWidth: "none" }} />
@@ -396,26 +455,162 @@ export const Scene2_Solusi: React.FC = () => {
                     }} 
                 />
             </div>
+            </div>
           </div>
           
-          {/* Floating Icons (Data Sources) */}
-          <div style={{ position: "absolute", top: 250, left: 300, opacity: floatIconsOpacity, transform: `translateY(${Math.sin(frame/15)*10}px) scale(${interpolate(floatIconsOpacity, [0, 1], [0.5, 1])})` }}>
-              <div style={{ backgroundColor: "white", padding: 20, borderRadius: 24, boxShadow: `0 10px 30px ${theme.ink}15` }}>
-                  <Img src={staticFile("icons/MongoDB.svg")} style={{ width: 60, height: 60, objectFit: "contain" }} />
-              </div>
-          </div>
-          <div style={{ position: "absolute", top: 750, left: 350, opacity: floatIconsOpacity, transform: `translateY(${Math.cos(frame/15)*10}px) scale(${interpolate(floatIconsOpacity, [0, 1], [0.5, 1])})` }}>
-              <div style={{ backgroundColor: "white", padding: 20, borderRadius: 24, boxShadow: `0 10px 30px ${theme.ink}15` }}>
-                  <Img src={staticFile("icons/postgresql-logo-svgrepo-com.svg")} style={{ width: 60, height: 60, objectFit: "contain" }} />
-              </div>
-          </div>
-          <div style={{ position: "absolute", top: 450, right: 300, opacity: floatIconsOpacity, transform: `translateY(${Math.sin((frame+20)/15)*10}px) scale(${interpolate(floatIconsOpacity, [0, 1], [0.5, 1])})` }}>
-              <div style={{ backgroundColor: "white", padding: 20, borderRadius: 24, boxShadow: `0 10px 30px ${theme.ink}15` }}>
-                  <Img src={staticFile("icons/google-analytics-icon.svg")} style={{ width: 60, height: 60, objectFit: "contain" }} />
-              </div>
+          {/* The DAG Lineage & Time */}
+          <div style={{
+              position: "absolute",
+              top: "50%",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 60,
+              opacity: interpolate(slideUpAirflow, [0, 1], [0, 1], { extrapolateRight: "clamp", extrapolateLeft: "clamp" }),
+              transform: `translateY(${interpolate(slideUpAirflow, [0, 1], [50, 0])}px)`
+          }}>
+              {/* Ticking Time */}
+              {/* Ticking Time */}
+              {(() => {
+                 const t = Math.max(0, frame - START_GRID);
+                 
+                 const toDay6 = spring({ frame: t - 15, fps, config: { damping: 14 } });
+                 const toHourlyText = spring({ frame: t - 100, fps, config: { damping: 14 } });
+                 
+                 const toHour1 = spring({ frame: t - 120, fps, config: { damping: 14 } });
+                 
+                 const hourOffsetIndex = toHour1;
+                 const clockSpin = (toDay6 * 360) + (hourOffsetIndex * 30);
+                 
+                 const hoursArray = ["00", "01"];
+
+                 return (
+                     <div style={{ display: "flex", alignItems: "center", gap: 15, color: theme.ink, fontFamily: "monospace", fontSize: 24, letterSpacing: 2 }}>
+                         <Clock size={28} style={{ transform: `rotate(${clockSpin}deg)` }} />
+                         <span style={{ display: "flex", gap: 8 }}>
+                             Schedule: 
+                             <div style={{ height: 30, overflow: "hidden", position: "relative", width: 105 }}>
+                                 <span style={{ position: "absolute", color: theme.accent, display: "flex", alignItems: "center", height: 30, transform: `translateY(-${toHourlyText * 100}%)` }}>@daily</span>
+                                 <span style={{ position: "absolute", color: theme.accent, display: "flex", alignItems: "center", height: 30, transform: `translateY(${(1 - toHourlyText) * 100}%)` }}>@hourly</span>
+                             </div>
+                             <div style={{ display: "flex", alignItems: "center", height: 30 }}>&bull; 2026-10-</div>
+                             
+                             {/* Date Ticker */}
+                             <div style={{ height: 30, overflow: "hidden" }}>
+                                 <div style={{ display: "flex", flexDirection: "column", transform: `translateY(-${toDay6 * 30}px)` }}>
+                                     <span style={{ height: 30, display: "flex", alignItems: "center" }}>05</span>
+                                     <span style={{ height: 30, display: "flex", alignItems: "center" }}>06</span>
+                                 </div>
+                             </div>
+                             
+                             <div style={{ display: "flex", alignItems: "center", height: 30, marginLeft: 5 }}>
+                                 {/* Hour Ticker */}
+                                 <div style={{ height: 30, overflow: "hidden" }}>
+                                     <div style={{ display: "flex", flexDirection: "column", transform: `translateY(-${hourOffsetIndex * 30}px)` }}>
+                                         {hoursArray.map((h, i) => (
+                                             <span key={i} style={{ height: 30, display: "flex", alignItems: "center" }}>{h}</span>
+                                         ))}
+                                     </div>
+                                 </div>
+                                 <span>:00</span>
+                             </div>
+                         </span>
+                     </div>
+                 );
+              })()}
+
+              {/* DAG Nodes */}
+              {(() => {
+                 const t = Math.max(0, frame - START_GRID);
+                 
+                 const isDaily = t < 110;
+                 
+                 const dagDailyProgress = t - 40; 
+                 const popDaily1 = dagDailyProgress >= 0 ? spring({ frame: dagDailyProgress, fps, config: { damping: 12, stiffness: 100 } }) : 0;
+                 const popDaily2 = dagDailyProgress >= 8 ? spring({ frame: dagDailyProgress - 8, fps, config: { damping: 12, stiffness: 100 } }) : 0;
+                 const popDaily3 = dagDailyProgress >= 16 ? spring({ frame: dagDailyProgress - 16, fps, config: { damping: 12, stiffness: 100 } }) : 0;
+
+                 const dagHourlyProgress = t - 140;
+                 const popHourly1 = dagHourlyProgress >= 0 ? spring({ frame: dagHourlyProgress, fps, config: { damping: 12, stiffness: 100 } }) : 0;
+                 const popHourly2 = dagHourlyProgress >= 8 ? spring({ frame: dagHourlyProgress - 8, fps, config: { damping: 12, stiffness: 100 } }) : 0;
+                 const popHourly3 = dagHourlyProgress >= 16 ? spring({ frame: dagHourlyProgress - 16, fps, config: { damping: 12, stiffness: 100 } }) : 0;
+
+                 const pop1 = isDaily ? popDaily1 : popHourly1;
+                 const pop2 = isDaily ? popDaily2 : popHourly2;
+                 const pop3 = isDaily ? popDaily3 : popHourly3;
+
+                 const edge1Active = isDaily ? dagDailyProgress > 6 : dagHourlyProgress > 6;
+                 const edge2Active = isDaily ? dagDailyProgress > 14 : dagHourlyProgress > 14;
+
+                 const cSucc = "#17A34A";
+                 const cSkip = "#EC4899";
+                 const cNone = "#D1D5DB";
+
+                 const state1 = pop1 > 0.1 ? "success" : "none";
+                 const state2Live = pop2 > 0.1 ? (isDaily ? "skipped" : "success") : "none";
+                 const state2Batch = pop2 > 0.1 ? (isDaily ? "success" : "skipped") : "none";
+                 const state3 = pop3 > 0.1 ? "success" : "none";
+
+                 const e1T = edge1Active ? (isDaily ? cSkip : cSucc) : cNone;
+                 const e1B = edge1Active ? (isDaily ? cSucc : cSkip) : cNone;
+                 const e2T = edge2Active ? (isDaily ? cSkip : cSucc) : cNone;
+                 const e2B = edge2Active ? (isDaily ? cSucc : cSkip) : cNone;
+
+                 const AirflowNode = ({ id, op, state, scale = 1, left, top }: any) => {
+                     const color = state === "success" ? cSucc : state === "skipped" ? cSkip : cNone;
+                     return (
+                        <div style={{
+                            position: "absolute", left, top,
+                            display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6,
+                            padding: "10px 15px", borderRadius: 6, backgroundColor: "#FFF",
+                            border: `2px solid ${color}`,
+                            transform: `scale(${scale})`,
+                            boxShadow: state !== "none" ? `0 4px 12px ${color}33` : "0 1px 3px rgba(0,0,0,0.1)",
+                            minWidth: 200, width: 220, zIndex: 1
+                        }}>
+                            <span style={{ color: "#111827", fontFamily: "system-ui, sans-serif", fontSize: 18, fontWeight: "bold" }}>
+                                {id}
+                            </span>
+                            <span style={{ color: "#6B7280", fontFamily: "system-ui, sans-serif", fontSize: 14 }}>
+                                {op}
+                            </span>
+                            <div style={{
+                                display: "flex", alignItems: "center", gap: 4,
+                                backgroundColor: color, color: "#FFF",
+                                padding: "2px 8px", borderRadius: 12,
+                                fontSize: 12, fontWeight: "bold", fontFamily: "system-ui, sans-serif",
+                                opacity: state !== "none" ? 1 : 0,
+                                transform: `scale(${state !== "none" ? 1 : 0.8})`,
+                                transition: "all 0.2s ease-out",
+                            }}>
+                                {state === "skipped" ? "⏭ skipped" : <><Check size={12} strokeWidth={4} /> success</>}
+                            </div>
+                        </div>
+                     );
+                 };
+
+                 return (
+                     <div style={{ position: "relative", width: 850, height: 260 }}>
+                         <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0 }}>
+                             {/* L1 -> Top */}
+                             <path d="M 220 125 L 250 125 L 270 60 L 300 60" stroke={e1T} strokeWidth={3} fill="none" strokeLinejoin="round" />
+                             {/* L1 -> Bottom */}
+                             <path d="M 220 125 L 250 125 L 270 190 L 300 190" stroke={e1B} strokeWidth={3} fill="none" strokeLinejoin="round" />
+                             
+                             {/* Top -> L2 */}
+                             <path d="M 520 60 L 550 60 L 570 125 L 600 125" stroke={e2T} strokeWidth={3} fill="none" strokeLinejoin="round" />
+                             {/* Bottom -> L2 */}
+                             <path d="M 520 190 L 550 190 L 570 125 L 600 125" stroke={e2B} strokeWidth={3} fill="none" strokeLinejoin="round" />
+                         </svg>
+
+                         <AirflowNode id="check_schedule" op="BranchPythonOperator" state={state1} scale={interpolate(pop1, [0, 0.5, 1], [1, 1.05, 1])} left={0} top={85} />
+                         <AirflowNode id="fetch_live_api" op="HttpOperator" state={state2Live} scale={interpolate(pop2, [0, 0.5, 1], [1, 1.05, 1])} left={300} top={20} />
+                         <AirflowNode id="fetch_batch_db" op="BigQueryOperator" state={state2Batch} scale={interpolate(pop2, [0, 0.5, 1], [1, 1.05, 1])} left={300} top={150} />
+                         <AirflowNode id="process_data" op="PythonOperator" state={state3} scale={interpolate(pop3, [0, 0.5, 1], [1, 1.05, 1])} left={600} top={85} />
+                     </div>
+                 );
+              })()}
           </div>
         </div>
-      )}
+        );
+      })()}
     </AbsoluteFill>
   );
 };
